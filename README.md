@@ -21,9 +21,11 @@ After that, a paid plan is optional. No provider API key is needed or bundled.
 Homebrew may ask you to trust this third-party cask. No installation step
 disables Gatekeeper or removes quarantine.
 
-Stop dictation and quit koe before upgrading. Removing the app does not erase
-your API keys or preferences; remove credentials separately in Keychain Access
-if desired.
+koe updates itself (Sparkle, signed updates from the same public releases), so
+the cask is marked `auto_updates` and `brew upgrade` leaves it to the app.
+`brew uninstall --cask koe` quits and removes the app; add `--zap` to also remove
+its preferences, caches and opt-in local history. Your sign-in stays in Keychain
+(service "com.koe.dictation"); remove it in Keychain Access if desired.
 
 - [Website and setup](https://saykoe.com/)
 - [Public binary releases](https://github.com/YIPG/koe-releases)
@@ -37,8 +39,9 @@ gh workflow run update-koe.yml --repo YIPG/homebrew-tap -f version=0.2.0
 ```
 
 The version above is an example, not an available release. The workflow downloads
-the exact public ZIP, `SHA256SUMS`, and generated `koe.rb` from that release. It
-checks the checksum and app identity/version, validates the signature and stapled
+the exact public ZIP, `SHA256SUMS` (which also lists the DMG), and generated
+`koe.rb` from that release. It checks the checksum, app identity/version and that
+the only symbolic links are Sparkle.framework's own, validates the signature and stapled
 notarization ticket, assesses Gatekeeper, and exercises the resource diagnostic
 before committing the cask. It rejects drafts and prereleases.
 

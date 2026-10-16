@@ -10,6 +10,26 @@ import sys
 import zipfile
 
 
+SPARKLE = PurePosixPath("koe.app/Contents/Frameworks/Sparkle.framework")
+
+
+def check_link(path, target):
+    """Only Sparkle.framework's own relative links (Versions/Current, Sparkle, Resources...) are expected."""
+    target = PurePosixPath(target)
+    if SPARKLE not in path.parents or target.is_absolute():
+        raise ValueError("Symbolic links are only expected inside Sparkle.framework.")
+    resolved = []
+    for part in (path.parent / target).parts:
+        if part == "..":
+            if not resolved:
+                raise ValueError("Symbolic links must stay inside Sparkle.framework.")
+            resolved.pop()
+        elif part != ".":
+            resolved.append(part)
+    if SPARKLE not in PurePosixPath(*resolved).parents:
+        raise ValueError("Symbolic links must stay inside Sparkle.framework.")
+
+
 def verify(version, directory):
     if not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version):
         raise ValueError("Use MAJOR.MINOR.PATCH.")
@@ -24,7 +44,14 @@ def verify(version, directory):
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     checksum = digest.hexdigest()
-    if (directory / "SHA256SUMS").read_text().split() != [checksum, name]:
+    # SHA256SUMS lists the disk image and the ZIP; the cask uses the ZIP.
+    sums = {}
+    for line in (directory / "SHA256SUMS").read_text().splitlines():
+        fields = line.split()
+        if len(fields) != 2 or fields[1] in sums:
+            raise ValueError("Malformed release checksum file.")
+        sums[fields[1]] = fields[0]
+    if sums.get(name) != checksum:
         raise ValueError("Release checksum does not match the exact ZIP.")
     with zipfile.ZipFile(archive) as bundle:
         for entry in bundle.infolist():
@@ -34,7 +61,7 @@ def verify(version, directory):
             if not path.parts or path.parts[0] not in ["koe.app", "__MACOSX"]:
                 raise ValueError("Unexpected top-level release content.")
             if stat.S_ISLNK(entry.external_attr >> 16):
-                raise ValueError("Symbolic links are not expected in this static application bundle.")
+                check_link(path, bundle.read(entry).decode("utf-8"))
         info = plistlib.loads(bundle.read("koe.app/Contents/Info.plist"))
         if info.get("CFBundleIdentifier") != "com.koe.dictation" or info.get("CFBundleShortVersionString") != version:
             raise ValueError("Unexpected app identity or version.")
@@ -46,15 +73,29 @@ def verify(version, directory):
 
   url "https://github.com/YIPG/koe-releases/releases/download/v#{{version}}/koe-#{{version}}-macos-arm64.zip"
   name "koe"
-  desc "Account-based menu bar dictation"
+  desc "Menu bar dictation for Japanese and English"
   homepage "https://saykoe.com/"
 
+  livecheck do
+    url "https://github.com/YIPG/koe-releases/releases/latest/download/appcast.xml"
+    strategy :sparkle
+  end
+
+  auto_updates true
   depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "koe.app"
 
   uninstall quit: "com.koe.dictation"
+
+  zap trash: [
+    "~/Library/Application Support/com.koe.dictation",
+    "~/Library/Caches/com.koe.dictation",
+    "~/Library/HTTPStorages/com.koe.dictation",
+    "~/Library/Preferences/com.koe.dictation.plist",
+    "~/Library/Saved Application State/com.koe.dictation.savedState",
+  ]
 end
 '''
     if cask != expected:

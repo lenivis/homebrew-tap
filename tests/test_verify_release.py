@@ -23,32 +23,47 @@ class ReleaseTests(unittest.TestCase):
         self.metadata = {"isDraft": False, "isPrerelease": False, "tagName": "v0.2.0"}
         self.write_fixture()
 
-    def write_fixture(self, entry=None):
+    def write_fixture(self, entry=None, content="fixture"):
         with zipfile.ZipFile(self.archive, "w") as archive:
             archive.writestr("koe.app/Contents/Info.plist", plistlib.dumps({
                 "CFBundleIdentifier": "com.koe.dictation",
                 "CFBundleShortVersionString": "0.2.0",
             }))
             if entry is not None:
-                archive.writestr(entry, "fixture")
+                archive.writestr(entry, content)
         digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
         (self.directory / "release.json").write_text(json.dumps(self.metadata))
-        (self.directory / "SHA256SUMS").write_text(f"{digest}  {self.name}\n")
+        (self.directory / "SHA256SUMS").write_text(
+            f"{'a' * 64}  koe-0.2.0-macos-arm64.dmg\n{digest}  {self.name}\n")
         (self.directory / "koe.rb").write_text(f'''cask "koe" do
   version "0.2.0"
   sha256 "{digest}"
 
   url "https://github.com/YIPG/koe-releases/releases/download/v#{{version}}/koe-#{{version}}-macos-arm64.zip"
   name "koe"
-  desc "Account-based menu bar dictation"
+  desc "Menu bar dictation for Japanese and English"
   homepage "https://saykoe.com/"
 
+  livecheck do
+    url "https://github.com/YIPG/koe-releases/releases/latest/download/appcast.xml"
+    strategy :sparkle
+  end
+
+  auto_updates true
   depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "koe.app"
 
   uninstall quit: "com.koe.dictation"
+
+  zap trash: [
+    "~/Library/Application Support/com.koe.dictation",
+    "~/Library/Caches/com.koe.dictation",
+    "~/Library/HTTPStorages/com.koe.dictation",
+    "~/Library/Preferences/com.koe.dictation.plist",
+    "~/Library/Saved Application State/com.koe.dictation.savedState",
+  ]
 end
 ''')
 
@@ -59,6 +74,13 @@ end
         (self.directory / "SHA256SUMS").write_text(f"{'0' * 64}  {self.name}\n")
         with self.assertRaisesRegex(ValueError, "checksum"):
             VERIFY.verify("0.2.0", self.directory)
+
+    def test_rejects_duplicate_or_malformed_checksums(self):
+        digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        for text in [f"{digest}  {self.name}\n{'0' * 64}  {self.name}\n", f"{digest}\n"]:
+            (self.directory / "SHA256SUMS").write_text(text)
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                VERIFY.verify("0.2.0", self.directory)
 
     def test_rejects_executable_cask_additions(self):
         with (self.directory / "koe.rb").open("a") as cask:
@@ -80,13 +102,33 @@ end
             with self.subTest(entry=entry), self.assertRaises(ValueError):
                 VERIFY.verify("0.2.0", self.directory)
 
-    def test_rejects_symbolic_links(self):
-        entry = zipfile.ZipInfo("koe.app/Contents/Resources/link")
+    @staticmethod
+    def link(path, target):
+        entry = zipfile.ZipInfo(path)
         entry.create_system = 3
         entry.external_attr = 0o120777 << 16
-        self.write_fixture(entry)
+        return entry, target
+
+    def test_rejects_symbolic_links_outside_sparkle(self):
+        self.write_fixture(*self.link("koe.app/Contents/Resources/link", "../../../etc"))
         with self.assertRaisesRegex(ValueError, "Symbolic links"):
             VERIFY.verify("0.2.0", self.directory)
+
+    def test_accepts_sparkle_framework_links(self):
+        framework = "koe.app/Contents/Frameworks/Sparkle.framework"
+        for path, target in [(f"{framework}/Versions/Current", "B"), (f"{framework}/Sparkle", "Versions/Current/Sparkle"),
+                             (f"{framework}/Resources", "Versions/Current/Resources")]:
+            with self.subTest(path=path):
+                self.write_fixture(*self.link(path, target))
+                VERIFY.verify("0.2.0", self.directory)
+
+    def test_rejects_sparkle_links_that_escape(self):
+        framework = "koe.app/Contents/Frameworks/Sparkle.framework"
+        for target in ["/usr/bin/true", "../../MacOS/koe", "Versions/../../../Info.plist"]:
+            with self.subTest(target=target):
+                self.write_fixture(*self.link(f"{framework}/Escape", target))
+                with self.assertRaisesRegex(ValueError, "Symbolic links"):
+                    VERIFY.verify("0.2.0", self.directory)
 
 
 if __name__ == "__main__":
