@@ -1,23 +1,17 @@
-# Yuya's Homebrew tap
+# Lenivis Homebrew tap
 
-Public casks for applications by [Yuya Ito](https://yuyakevinito.com/).
-Application, service and website source are private. This repository contains
-only public Homebrew installation metadata, not application source.
+Casks for applications by [Lenivis LLC](https://lenivis.com/). Application,
+service and website source are private; this repository holds only Homebrew
+installation metadata.
 
 ## koe
-
-**The first notarized release is not published yet.** There is deliberately no
-placeholder cask or fabricated checksum in this repository.
-
-After a notarized release is published and `Casks/koe.rb` is added, install with:
 
 ```sh
 brew install lenivis/tap/koe
 ```
 
-koe requires an Apple Silicon Mac running macOS 13 or later and a koe account.
-The first ten minutes are free, without a card, once account access is available.
-After that, a paid plan is optional. No provider API key is needed or bundled.
+koe needs an Apple Silicon Mac running macOS 13 or later and a koe account
+(invite-only for now). The first 30 minutes are free, without a card. After that, a paid plan is optional. No provider API key is needed or bundled.
 Homebrew may ask you to trust this third-party cask. No installation step
 disables Gatekeeper or removes quarantine.
 
