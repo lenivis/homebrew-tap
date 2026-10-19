@@ -12,7 +12,7 @@ placeholder cask or fabricated checksum in this repository.
 After a notarized release is published and `Casks/koe.rb` is added, install with:
 
 ```sh
-brew install --cask yipg/tap/koe
+brew install lenivis/tap/koe
 ```
 
 koe requires an Apple Silicon Mac running macOS 13 or later and a koe account.
@@ -35,10 +35,10 @@ its preferences, caches and opt-in local history. Your sign-in stays in Keychain
 After `YIPG/koe-releases` publishes a real notarized release:
 
 ```sh
-gh workflow run update-koe.yml --repo YIPG/homebrew-tap -f version=0.2.0
+gh workflow run update-koe.yml --repo lenivis/homebrew-tap -f version=0.9.1
 ```
 
-The version above is an example, not an available release. The workflow downloads
+The version above is an example. The workflow downloads
 the exact public ZIP, `SHA256SUMS` (which also lists the DMG), and generated
 `koe.rb` from that release. It checks the checksum, app identity/version and that
 the only symbolic links are Sparkle.framework's own, validates the signature and stapled
