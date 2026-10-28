@@ -1,6 +1,6 @@
 cask "koe" do
-  version "0.9.1"
-  sha256 "44df2ef09c4abf8513028b4c41e38a81bee62bdd61a590aad55f5e77e8152ba2"
+  version "0.9.2"
+  sha256 "9c1039a58b3632842e29e33f2d38578f9f897072dbc14e7a89e9eaddffadee7a"
 
   url "https://github.com/YIPG/koe-releases/releases/download/v#{version}/koe-#{version}-macos-arm64.zip"
   name "koe"
