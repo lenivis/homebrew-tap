@@ -122,6 +122,20 @@ end
                 self.write_fixture(*self.link(path, target))
                 VERIFY.verify("0.2.0", self.directory)
 
+    def test_accepts_transcribe_framework_links(self):
+        framework = "koe.app/Contents/Frameworks/CTranscribe.framework"
+        for path, target in [(f"{framework}/Versions/Current", "A"), (f"{framework}/CTranscribe", "Versions/Current/CTranscribe"),
+                             (f"{framework}/Headers", "Versions/Current/Headers")]:
+            with self.subTest(path=path):
+                self.write_fixture(*self.link(path, target))
+                VERIFY.verify("0.2.0", self.directory)
+
+    def test_rejects_links_from_one_framework_into_another(self):
+        self.write_fixture(*self.link("koe.app/Contents/Frameworks/CTranscribe.framework/Escape",
+                                      "../Sparkle.framework/Versions/Current/Sparkle"))
+        with self.assertRaisesRegex(ValueError, "Symbolic links"):
+            VERIFY.verify("0.2.0", self.directory)
+
     def test_rejects_sparkle_links_that_escape(self):
         framework = "koe.app/Contents/Frameworks/Sparkle.framework"
         for target in ["/usr/bin/true", "../../MacOS/koe", "Versions/../../../Info.plist"]:

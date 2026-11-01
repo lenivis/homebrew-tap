@@ -10,24 +10,27 @@ import sys
 import zipfile
 
 
-SPARKLE = PurePosixPath("koe.app/Contents/Frameworks/Sparkle.framework")
+# Bundled frameworks whose own relative links (Versions/Current, the binary, Resources...) are expected:
+# Sparkle (updates) and CTranscribe (transcribe.cpp, recognition on the Mac, koe 0.9.5+).
+FRAMEWORKS = [PurePosixPath(f"koe.app/Contents/Frameworks/{name}.framework") for name in ("Sparkle", "CTranscribe")]
 
 
 def check_link(path, target):
-    """Only Sparkle.framework's own relative links (Versions/Current, Sparkle, Resources...) are expected."""
+    """A link must be relative and stay inside the bundled framework it belongs to."""
     target = PurePosixPath(target)
-    if SPARKLE not in path.parents or target.is_absolute():
-        raise ValueError("Symbolic links are only expected inside Sparkle.framework.")
+    framework = next((framework for framework in FRAMEWORKS if framework in path.parents), None)
+    if framework is None or target.is_absolute():
+        raise ValueError("Symbolic links are only expected inside the bundled frameworks.")
     resolved = []
     for part in (path.parent / target).parts:
         if part == "..":
             if not resolved:
-                raise ValueError("Symbolic links must stay inside Sparkle.framework.")
+                raise ValueError("Symbolic links must stay inside their framework.")
             resolved.pop()
         elif part != ".":
             resolved.append(part)
-    if SPARKLE not in PurePosixPath(*resolved).parents:
-        raise ValueError("Symbolic links must stay inside Sparkle.framework.")
+    if framework not in PurePosixPath(*resolved).parents:
+        raise ValueError("Symbolic links must stay inside their framework.")
 
 
 def verify(version, directory):
